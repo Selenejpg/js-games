@@ -1,7 +1,7 @@
 const canvas = document.getElementById('canvas1');
 const ctx = canvas.getContext('2d');
-canvas.width = 500;
-canvas.height = 600;
+canvas.width = 750;
+canvas.height = 650;
 const explosions = [];
 let canvasPosition = canvas.getBoundingClientRect(); //restituisce un oggetto, restituendo informazioni sulla sua dimensione e posizione in riferimento alla viewport
 
