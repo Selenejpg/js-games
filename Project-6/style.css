@@ -1,0 +1,23 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body{
+    background-image: url(./assets/silhouette-shadow-forest-scene_1308-108083.webp);
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;  
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
