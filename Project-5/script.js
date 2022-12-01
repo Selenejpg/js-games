@@ -1,73 +1,105 @@
+//canvas
 const canvas = document.getElementById('canvas1');
 const ctx = canvas.getContext('2d');
-canvas.width = 750;
-canvas.height = 650;
-const explosions = [];
-let canvasPosition = canvas.getBoundingClientRect(); //restituisce un oggetto, restituendo informazioni sulla sua dimensione e posizione in riferimento alla viewport
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-class Explosion {
-    constructor(x, y) {
-        this.spriteWidth = 200;
-        this.spriteHeight = 179;
-        this.width = this.spriteWidth * 0.7;
-        this.height = this.spriteHeight * 0.7;
-        this.x = x;
-        this.y = y;
+//collision canvas
+const collisionCanvas = document.getElementById('collisionCanvas');
+const collisionCtx = collisionCanvas.getContext('2d');
+collisionCanvas.width = window.innerWidth;
+collisionCanvas.height = window.innerHeight;
+
+let score = 0;
+ctx.font = '55px Arial';
+
+let timeToNextRaven = 0;
+let ravenInterval = 500;
+let lastTime = 0;
+
+let ravens = [];
+class Raven {
+    constructor() {
+        this.spriteWidth = 271;
+        this.spriteHeight = 194;
+        this.sizeModifier = Math.random() * 0.6 + 0.4;
+        this.width = this.spriteWidth * this.sizeModifier;
+        this.height = this.spriteHeight * this.sizeModifier;
+        this.x = canvas.width;
+        this.y = Math.random() * canvas.height; - this.height;
+        this.directionX = Math.random() * 5 + 3;
+        this.directionY = Math.random() * 5 + - 2.5;
+        this.markedForDeletion = false;
         this.image = new Image();
-        this.image.src = 'assets/boom.png'
+        this.image.src = 'assets/raven.png';
         this.frame = 0;
-        this.timer = 0;
-        this.angle = Math.random() * 6.2;
-        this.sound = new Audio();
-        this.sound.src = 'assets/snd_chicksword_anger_shoot.ogg';
+        this.maxFrame = 4;
+        this.timeSinceFlap = 0;
+        this.flapInterval = Math.random() * 50 + 50;
+        this.randomColors = [Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)];
+        this.color = 'rgb(' + this.randomColors[0] + ',' + this.randomColors[1] + ',' + this.randomColors[2] + ')';
     }
-    update() {
-        if (this.frame === 0) this.sound.play();
-        this.timer++;
-        if (this.timer % 10 === 0) {
-            this.frame++;
+    update(deltaTime) {
+        if (this.y < 0 || this.y > canvas.height - this.height) {
+            this.directionY = this.directionY * -1;
+        }
+        this.x -= this.directionX;
+        this.y -= this.directionY;
+        if (this.x < 0 - this.width) this.markedForDeletion = true;
+        this.timeSinceFlap += deltaTime;
+        if (this.timeSinceFlap > this.flapInterval) {
+            if (this.frame > this.maxFrame) this.frame = 0;
+            else this.frame++;
+            this.timeSinceFlap = 0;
         }
     }
     draw() {
-        //ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh)
-        //3/6/9 argomenti. il primo è l'immagine che vogliamo disegnare nel canvas. poi x, y altezza e larghezza dell'area che vuoi ritagliare dallo sheet. poi destination x, y, width e height. ovvero coordinate che indicano dove vuoi posizionarlo con x e y e che altezza e larghezza deve avere
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-        ctx.drawImage(this.image, this.spriteWidth * this.frame, 0, this.spriteWidth, this.spriteHeight, 0 - this.width/2, 0 - this.height/2, this.width, this.height)
-        ctx.restore();
+        collisionCtx.fillStyle = this.color;
+        collisionCtx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.drawImage(this.image, this.frame * this.spriteWidth, 0, this.spriteWidth, this.spriteHeight, this.x, this.y, this.width, this.height)
     }
 }
 
-//al click appaiono quadrati sotto il mouse
-// window.addEventListener('click', function(e) {
-//     ctx.fillStyle = 'lavender';
-//     ctx.fillRect(e.x - canvasPosition.left -25, e.y - canvasPosition.top -25, 50, 50);
-// });
-
-
-//mousemove event, letteralmente segue il mouse quindi puoi crearci delle scie
-window.addEventListener('click', function(e) {
-    createAnimation(e);
-});
-
-function createAnimation(e){
-    let positionX = e.x - canvasPosition.left;
-    let positionY = e.y - canvasPosition.top;
-    explosions.push(new Explosion(positionX, positionY));
+function drawScore(){
+    ctx.fillStyle = 'black';
+    ctx.fillText('Score: ' + score, 50, 75);
+    ctx.fillStyle = 'black';
+    ctx.fillText('Score: ' + score, 50, 80);
+    ctx.fillStyle = 'white';
+    ctx.fillText('Score: ' + score, 53, 78);
 }
 
-function animate(){
+window.addEventListener('click', function(e){
+    const detectPixelColor = collisionCtx.getImageData(e.x, e.y, 1, 1);
+    console.log(detectPixelColor);
+})
+
+function animate(timestamp) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (let i = 0; i < explosions.length; i++) {
-        explosions[i].update();
-        explosions[i].draw();
-        if (explosions[i].frame > 5) {
-            explosions.splice(i, 1);
-            i--;
-        }
+    collisionCtx.clearRect(0, 0, canvas.width, canvas.height);
+    let deltaTime = timestamp - lastTime;
+    lastTime = timestamp;
+    timeToNextRaven += deltaTime;
+    if (timeToNextRaven > ravenInterval) {
+        ravens.push(new Raven());
+        timeToNextRaven = 0;
+        ravens.sort(function(a,b){
+            return a.width - b.width;
+        });
     }
+
+    
+    drawScore();
+
+    //array literal.  ... = spread operator permette alle cose iterabili di espandersi in un altro array
+    //la linea di codice ciclerà per tutto il ravens array e triggererà update method in ogni array. trovandoci noi nel loop di animate questo accadrà per pgni frame di animazione
+    [...ravens].forEach(object => object.update(deltaTime));
+    [...ravens].forEach(object => object.draw());
+
+    ravens = ravens.filter(object => !object.markedForDeletion);
+
     requestAnimationFrame(animate);
-};
-animate();
+}
+
+animate(0);
+
