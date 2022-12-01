@@ -11,6 +11,7 @@ collisionCanvas.width = window.innerWidth;
 collisionCanvas.height = window.innerHeight;
 
 let score = 0;
+let gameOver = false;
 ctx.font = '55px Arial';
 
 let timeToNextRaven = 0;
@@ -38,6 +39,7 @@ class Raven {
         this.flapInterval = Math.random() * 50 + 50;
         this.randomColors = [Math.floor(Math.random() * 255), Math.floor(Math.random() * 255), Math.floor(Math.random() * 255)];
         this.color = 'rgb(' + this.randomColors[0] + ',' + this.randomColors[1] + ',' + this.randomColors[2] + ')';
+        this.hasTrail = Math.random() > 0.5;
     }
     update(deltaTime) {
         if (this.y < 0 || this.y > canvas.height - this.height) {
@@ -51,7 +53,13 @@ class Raven {
             if (this.frame > this.maxFrame) this.frame = 0;
             else this.frame++;
             this.timeSinceFlap = 0;
+            if (this.hasTrail) {
+                for (let i = 0; i < 5; i++) {
+                    particles.push(new Particle(this.x, this.y, this.width, this.color)); 
+                }
+            }
         }
+        if (this.x < 0 - this.width) gameOver = true;
     }
     draw() {
         collisionCtx.fillStyle = this.color;
@@ -60,18 +68,93 @@ class Raven {
     }
 }
 
+let explosions = [];
+class Explosion {
+    constructor(x, y, size) {
+        this.image = new Image();
+        this.image.src = 'assets/boom.png';
+        this.spriteWidth = 200;
+        this.spriteHeight = 179;
+        this.size = size;
+        this.x = x;
+        this.y = y;
+        this.frame = 0;
+        this.sound = new Audio();
+        this.sound.src = 'assets/snd_chicksword_anger_shoot.ogg';
+        this.timeSinceLastFrame = 0;
+        this.frameInterval = 200;
+        this.markedForDeletion = false;
+    }
+    update(deltaTime){
+        if (this.frame === 0) this.sound.play();
+        this.timeSinceLastFrame += deltaTime;
+        if (this.timeSinceLastFrame > this.frameInterval){
+            this.frame++;
+            this.timeSinceLastFrame = 0;
+            if (this.frame > 5) this.markedForDeletion = true;
+        }
+    }
+    draw(){
+        ctx.drawImage(this.image, this.frame * this.spriteWidth, 0, this.spriteWidth, this.spriteHeight, this.x, this.y - this.size/4, this.size, this.size);
+    }
+}
+
+let particles = [];
+class Particle {
+    constructor(x, y, size, color) {
+        this.size = size;
+        this.x = x + this.size/2 + Math.random() * 50 - 25;
+        this.y = y + this.size/3 + Math.random() * 50 - 25;
+        this.radius = Math.random() * this.size/10;
+        this.maxRadius = Math.random() * 20 + 35;
+        this.markedForDeletion = false;
+        this.speedX = Math.random() * 1 + 0.5;
+        this.color = color;
+    }
+    update(){
+        this.x += this.speedX;
+        this.radius += 0.3;
+        if (this.radius > this.maxRadius - 5) this.markedForDeletion = true;
+    }
+    draw(){
+        ctx.save();
+        ctx.globalAlpha = 1 - this.radius/this.maxRadius;
+        ctx.beginPath();
+        ctx.fillStyle = this.color;
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
 function drawScore(){
     ctx.fillStyle = 'black';
     ctx.fillText('Score: ' + score, 50, 75);
-    ctx.fillStyle = 'black';
-    ctx.fillText('Score: ' + score, 50, 80);
     ctx.fillStyle = 'white';
     ctx.fillText('Score: ' + score, 53, 78);
+}
+
+function drawGameOver(){
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'black';
+    ctx.fillText('Game Over! Good job! Your score is ' + score, canvas.width/2 - 3, canvas.height/2 - 3)
+    ctx.fillStyle = 'white';
+    ctx.fillText('Game Over! Good job! Your score is ' + score, canvas.width/2, canvas.height/2)
 }
 
 window.addEventListener('click', function(e){
     const detectPixelColor = collisionCtx.getImageData(e.x, e.y, 1, 1);
     console.log(detectPixelColor);
+    const pc = detectPixelColor.data;
+    ravens.forEach(object => {
+        if (object.randomColors[0] === pc[0] && object.randomColors[1] === pc[1] && object.randomColors[2] === pc[2]) {
+            //collision detected
+            object.markedForDeletion = true;
+            score++;
+            explosions.push(new Explosion(object.x, object.y, object.width));
+            console.log(explosions);
+        }
+    });
 })
 
 function animate(timestamp) {
@@ -87,18 +170,20 @@ function animate(timestamp) {
             return a.width - b.width;
         });
     }
-
     
     drawScore();
 
     //array literal.  ... = spread operator permette alle cose iterabili di espandersi in un altro array
     //la linea di codice ciclerà per tutto il ravens array e triggererà update method in ogni array. trovandoci noi nel loop di animate questo accadrà per pgni frame di animazione
-    [...ravens].forEach(object => object.update(deltaTime));
-    [...ravens].forEach(object => object.draw());
+    [...particles, ...ravens, ...explosions].forEach(object => object.update(deltaTime));
+    [...particles, ...ravens, ...explosions].forEach(object => object.draw());
 
     ravens = ravens.filter(object => !object.markedForDeletion);
+    explosions = explosions.filter(object => !object.markedForDeletion);
+    particles = particles.filter(object => !object.markedForDeletion);
 
-    requestAnimationFrame(animate);
+    if (!gameOver) requestAnimationFrame(animate);
+    else drawGameOver();
 }
 
 animate(0);
